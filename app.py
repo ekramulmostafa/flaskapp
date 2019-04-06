@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_marshmallow import Marshmallow
-from marshmallow import fields
+from marshmallow import fields, post_load, post_dump
 
 app = Flask(__name__)
 
@@ -56,8 +56,28 @@ class RoleModelSchema(ma.ModelSchema):
 
 
 class UserRoleModelSchema(ma.ModelSchema):
+    username = fields.Str(load_only=True)
+    rolename = fields.Str(load_only=True)
+
     class Meta:
         model = UserRoleModel
+        fields = ['id', 'user_id', 'role_id', 'username']
+
+    @post_dump(pass_many=True, pass_original=True)
+    def get_role_user_name(self, data, many, po):
+        if many:
+            for dt in data:
+                user = UserModel.query.get(dt['user_id'])
+                dt['username'] = user.name
+
+                role = RoleModel.query.get(dt['role_id'])
+                dt['rolename'] = role.role_name
+
+            return data
+        # if hasattr(data, 'user_id'):
+        #     print(data['user_id'])
+        # else:
+        #     print('none')
 
 
 class UserModelSchema(ma.ModelSchema):
@@ -73,8 +93,8 @@ roles_schema = RoleModelSchema(many=True)
 user_schema = UserModelSchema()
 users_schema = UserModelSchema(many=True)
 
-user_role_schema = UserModelSchema()
-users_role_schema = UserModelSchema(many=True)
+user_role_schema = UserRoleModelSchema()
+users_role_schema = UserRoleModelSchema(many=True)
 
 
 @app.route('/role/post', methods=['POST'])
